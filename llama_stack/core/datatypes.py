@@ -481,6 +481,13 @@ If not specified, a default SQLite store will be used.""",
 Configuration for the persistence store used by the conversations API.
 If not specified, a default SQLite store will be used.""",
     )
+    
+    persistent_memory: dict[str, Any] | None = Field(
+        default=None,
+        description="""
+Configuration for the persistent memory service. If not specified, persistent memory
+will be disabled by default.""",
+    )
 
     # registry of "resources" in the distribution
     models: list[ModelInput] = Field(default_factory=list)

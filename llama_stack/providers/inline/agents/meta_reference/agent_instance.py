@@ -105,6 +105,7 @@ class ChatAgent(ShieldRunnerMixin):
         created_at: str,
         policy: list[AccessRule],
         telemetry_enabled: bool = False,
+        memory_service=None,
     ):
         self.agent_id = agent_id
         self.agent_config = agent_config
@@ -116,6 +117,7 @@ class ChatAgent(ShieldRunnerMixin):
         self.tool_groups_api = tool_groups_api
         self.created_at = created_at
         self.telemetry_enabled = telemetry_enabled
+        self.memory_service = memory_service
 
         ShieldRunnerMixin.__init__(
             self,
@@ -123,6 +125,21 @@ class ChatAgent(ShieldRunnerMixin):
             input_shields=agent_config.input_shields,
             output_shields=agent_config.output_shields,
         )
+    
+    def _is_persistent_memory_enabled(self) -> bool:
+        """Check if persistent memory is enabled for this agent."""
+        if not self.memory_service:
+            return False
+        
+        # Check agent-level config first
+        if hasattr(self.agent_config, "persistent_memory") and self.agent_config.persistent_memory:
+            if isinstance(self.agent_config.persistent_memory, dict):
+                enabled = self.agent_config.persistent_memory.get("enabled")
+                if enabled is not None:
+                    return enabled
+        
+        # Fall back to service-level config
+        return self.memory_service.config.enabled
 
     def turn_to_messages(self, turn: Turn) -> list[Message]:
         messages = []
@@ -312,6 +329,20 @@ class ChatAgent(ShieldRunnerMixin):
             steps=steps,
         )
         await self.storage.add_turn_to_session(request.session_id, turn)
+        
+        # Store memory entries if persistent memory is enabled
+        if self.memory_service and self._is_persistent_memory_enabled():
+            try:
+                await self.memory_service.add_turn(
+                    agent_id=self.agent_id,
+                    session_id=request.session_id,
+                    messages=input_messages,
+                    output=output_message,
+                    summarize=False,  # TODO: support summarization
+                )
+            except Exception as e:
+                logger.error(f"Failed to store memory entries: {e}")
+        
         if output_message.tool_calls:
             chunk = AgentTurnResponseStreamChunk(
                 event=AgentTurnResponseEvent(
