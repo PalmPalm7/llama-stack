@@ -43,6 +43,7 @@ CATEGORIES = [
     "post_training",
     "scoring",
     "tests",
+    "memory",
 ]
 UNCATEGORIZED = "uncategorized"
 

@@ -526,6 +526,22 @@ class ChatAgent(ShieldRunnerMixin):
                         self.tool_name_to_args[tool_name]["vector_db_ids"] = [session_info.vector_db_id]
                     else:
                         self.tool_name_to_args[tool_name]["vector_db_ids"].append(session_info.vector_db_id)
+        
+        # Add persistent memory vector_db_id if enabled
+        if self.memory_service and self._is_persistent_memory_enabled():
+            try:
+                store_meta = await self.memory_service.get_store_meta(self.agent_id)
+                if store_meta:
+                    for tool_name in self.tool_name_to_args.keys():
+                        if tool_name == MEMORY_QUERY_TOOL:
+                            if "vector_db_ids" not in self.tool_name_to_args[tool_name]:
+                                self.tool_name_to_args[tool_name]["vector_db_ids"] = [store_meta.vector_db_id]
+                            else:
+                                # Only add if not already present
+                                if store_meta.vector_db_id not in self.tool_name_to_args[tool_name]["vector_db_ids"]:
+                                    self.tool_name_to_args[tool_name]["vector_db_ids"].append(store_meta.vector_db_id)
+            except Exception as e:
+                logger.error(f"Failed to get persistent memory store metadata: {e}")
 
         output_attachments = []
 

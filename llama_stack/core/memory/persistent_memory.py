@@ -267,10 +267,10 @@ class MemoryServiceImpl:
         if documents:
             try:
                 chunking_strategy = VectorStoreChunkingStrategyStatic(
-                    chunking_strategy_type="static",
-                    config=VectorStoreChunkingStrategyStaticConfig(
-                        chunk_size_in_tokens=store_meta.chunk_size_in_tokens,
-                        overlap_size_in_tokens=store_meta.overlap_size_in_tokens,
+                    type="static",
+                    static=VectorStoreChunkingStrategyStaticConfig(
+                        chunk_overlap_tokens=store_meta.overlap_size_in_tokens,
+                        max_chunk_size_tokens=store_meta.chunk_size_in_tokens,
                     ),
                 )
                 
