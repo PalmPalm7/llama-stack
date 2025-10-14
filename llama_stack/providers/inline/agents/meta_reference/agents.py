@@ -54,6 +54,18 @@ from .responses.openai_responses import OpenAIResponsesImpl
 
 logger = get_logger(name=__name__, category="agents::meta_reference")
 
+# Import memory service if available
+try:
+    from llama_stack.core.memory.persistent_memory import (
+        MemoryServiceImpl,
+        PersistentMemoryConfig,
+    )
+    MEMORY_SERVICE_AVAILABLE = True
+except ImportError:
+    MEMORY_SERVICE_AVAILABLE = False
+    MemoryServiceImpl = None
+    PersistentMemoryConfig = None
+
 
 class MetaReferenceAgentsImpl(Agents):
     def __init__(
@@ -80,6 +92,7 @@ class MetaReferenceAgentsImpl(Agents):
         self.in_memory_store = InmemoryKVStoreImpl()
         self.openai_responses_impl: OpenAIResponsesImpl | None = None
         self.policy = policy
+        self.memory_service = None
 
     async def initialize(self) -> None:
         self.persistence_store = await kvstore_impl(self.config.persistence_store)
@@ -93,6 +106,22 @@ class MetaReferenceAgentsImpl(Agents):
             vector_io_api=self.vector_io_api,
             conversations_api=self.conversations_api,
         )
+        
+        # Initialize memory service if persistent memory config is available
+        if MEMORY_SERVICE_AVAILABLE and hasattr(self.config, "persistent_memory"):
+            memory_config = self.config.persistent_memory
+            if memory_config and memory_config.get("enabled", False):
+                try:
+                    pm_config = PersistentMemoryConfig(**memory_config)
+                    self.memory_service = MemoryServiceImpl(
+                        config=pm_config,
+                        kv_store=self.persistence_store,
+                        vector_io_api=self.vector_io_api,
+                        inference_api=self.inference_api,
+                    )
+                    logger.info("Persistent memory service initialized")
+                except Exception as e:
+                    logger.error(f"Failed to initialize memory service: {e}")
 
     async def create_agent(
         self,
@@ -111,10 +140,33 @@ class MetaReferenceAgentsImpl(Agents):
             key=f"agent:{agent_id}",
             value=agent_info.model_dump_json(),
         )
+        
+        # Provision memory store if persistent memory is enabled
+        if self.memory_service and self._is_persistent_memory_enabled(agent_config):
+            try:
+                await self.memory_service.get_or_create_store(agent_id, agent_config)
+                logger.info(f"Provisioned persistent memory store for agent {agent_id}")
+            except Exception as e:
+                logger.error(f"Failed to provision memory store for agent {agent_id}: {e}")
 
         return AgentCreateResponse(
             agent_id=agent_id,
         )
+    
+    def _is_persistent_memory_enabled(self, agent_config: AgentConfig) -> bool:
+        """Check if persistent memory is enabled for an agent."""
+        # Check agent-level config first
+        if hasattr(agent_config, "persistent_memory") and agent_config.persistent_memory:
+            if isinstance(agent_config.persistent_memory, dict):
+                enabled = agent_config.persistent_memory.get("enabled")
+                if enabled is not None:
+                    return enabled
+        
+        # Fall back to service-level config
+        if self.memory_service:
+            return self.memory_service.config.enabled
+        
+        return False
 
     async def _get_agent_impl(self, agent_id: str) -> ChatAgent:
         agent_info_json = await self.persistence_store.get(
@@ -142,6 +194,7 @@ class MetaReferenceAgentsImpl(Agents):
             created_at=agent_info.created_at,
             policy=self.policy,
             telemetry_enabled=self.telemetry_enabled,
+            memory_service=self.memory_service,
         )
 
     async def create_agent_session(

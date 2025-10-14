@@ -252,6 +252,7 @@ class AgentConfig(AgentConfigCommon):
     :param name: Optional name for the agent, used in telemetry and identification
     :param enable_session_persistence: Optional flag indicating whether session data has to be persisted
     :param response_format: Optional response format configuration
+    :param persistent_memory: Optional configuration for persistent memory
     """
 
     model: str
@@ -259,6 +260,7 @@ class AgentConfig(AgentConfigCommon):
     name: str | None = None
     enable_session_persistence: bool | None = False
     response_format: ResponseFormat | None = None
+    persistent_memory: dict[str, Any] | None = None
 
 
 @json_schema_type

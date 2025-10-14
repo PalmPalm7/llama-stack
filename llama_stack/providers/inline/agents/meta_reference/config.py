@@ -16,6 +16,7 @@ from llama_stack.providers.utils.sqlstore.sqlstore import SqliteSqlStoreConfig, 
 class MetaReferenceAgentsImplConfig(BaseModel):
     persistence_store: KVStoreConfig
     responses_store: SqlStoreConfig
+    persistent_memory: dict[str, Any] | None = None
 
     @classmethod
     def sample_run_config(cls, __distro_dir__: str) -> dict[str, Any]:
