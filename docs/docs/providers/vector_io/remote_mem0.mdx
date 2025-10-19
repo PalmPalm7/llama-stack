@@ -1,0 +1,159 @@
+---
+title: Mem0 Vector IO (Remote)
+description: Use Mem0 as a RAG memory backend via the VectorIO API
+sidebar_label: remote::mem0
+---
+
+# remote::mem0
+
+## Description
+A VectorIO provider that stores and searches knowledge in [Mem0](https://mem0.ai). Works with Mem0 Cloud and Mem0 Local.
+
+Mem0 provides intelligent memory management for AI applications, making it easy to build RAG systems with persistent memory.
+
+## Features
+
+- **Cloud and Local Support**: Use Mem0 Cloud for managed service or Mem0 Local for self-hosted deployments
+- **Namespace Isolation**: Automatically isolates memories per vector database using user_id namespacing
+- **Simple Integration**: Minimal configuration required to get started
+- **Memory Management**: Leverages Mem0's built-in memory management capabilities
+
+## Sample Configuration
+
+### Mem0 Cloud Configuration
+
+```yaml
+providers:
+  - api: vector_io
+    provider_id: mem0
+    provider_type: remote::mem0
+    pip_packages:
+      - mem0>=0.1.0
+    config:
+      is_cloud: true
+      api_key: ${env.MEM0_API_KEY}
+      user_namespace: llama
+```
+
+### Mem0 Local Configuration
+
+```yaml
+providers:
+  - api: vector_io
+    provider_id: mem0
+    provider_type: remote::mem0
+    pip_packages:
+      - mem0>=0.1.0
+    config:
+      is_cloud: false
+      local_config:
+        vector_store:
+          provider: "qdrant"
+          config:
+            collection_name: "mem0"
+            host: "localhost"
+            port: 6333
+        embedder:
+          provider: "openai"
+          config:
+            model: "text-embedding-3-small"
+      user_namespace: llama
+```
+
+## Register a Vector DB
+
+```yaml
+vector_dbs:
+  - vector_db_id: my_mem0_db
+    provider_id: mem0
+    embedding_model: "nomic-ai/nomic-embed-text-v1.5"
+    embedding_dimension: 768
+```
+
+> **Note**: Mem0 manages embeddings internally. The `embedding_model` and `embedding_dimension` parameters are recorded for consistency with other providers but are not used by Mem0 directly.
+
+## Configuration Parameters
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `is_cloud` | `bool` | No | `true` | Use Mem0 cloud if True; local Mem0 if False |
+| `api_key` | `str \| None` | No | `None` | Mem0 cloud API key (required for cloud mode) |
+| `base_url` | `str \| None` | No | `None` | Optional custom base URL for Mem0 cloud |
+| `local_config` | `dict \| None` | No | `None` | Configuration for Mem0 local (required when is_cloud=False) |
+| `user_namespace` | `str` | No | `"llamastack"` | Prefix for Mem0 user_id namespacing |
+| `default_limit` | `int` | No | `5` | Default search result limit (1-100) |
+
+## Search Modes
+
+Currently, the Mem0 provider supports:
+
+- **Vector Search**: Semantic similarity search using embeddings (default and only mode in initial release)
+
+## Limitations
+
+- Only vector-style search is implemented initially
+- Per-chunk deletion (`delete_chunks`) is not yet supported
+- Unregistering a vector DB wipes the entire Mem0 namespace for that database
+- Keyword and hybrid search modes are not currently available
+
+## Installation
+
+### Mem0 Cloud
+
+To use Mem0 Cloud:
+
+1. Sign up at [Mem0](https://mem0.ai)
+2. Get your API key
+3. Install the mem0 package:
+
+```bash
+pip install mem0
+```
+
+4. Set your API key as an environment variable:
+
+```bash
+export MEM0_API_KEY=your_api_key_here
+```
+
+### Mem0 Local
+
+For local deployment, follow the [Mem0 installation guide](https://docs.mem0.ai/installation) and configure your local vector store and embedder.
+
+## Documentation
+
+For more details about Mem0:
+- [Mem0 Documentation](https://docs.mem0.ai)
+- [Mem0 GitHub Repository](https://github.com/mem0ai/mem0)
+
+## Example Usage
+
+```python
+from llama_stack.apis.vector_io import Chunk
+
+# Insert chunks
+await vector_io.insert_chunks(
+    vector_db_id="my_mem0_db",
+    chunks=[
+        Chunk(
+            content="Python is a high-level programming language.",
+            metadata={"topic": "programming"}
+        ),
+        Chunk(
+            content="Machine learning uses statistical techniques.",
+            metadata={"topic": "ml"}
+        ),
+    ]
+)
+
+# Query chunks
+response = await vector_io.query_chunks(
+    vector_db_id="my_mem0_db",
+    query="What is Python?",
+    params={"max_chunks": 5}
+)
+
+print(f"Found {len(response.chunks)} relevant chunks")
+for chunk, score in zip(response.chunks, response.scores):
+    print(f"Score: {score}, Content: {chunk.content}")
+```

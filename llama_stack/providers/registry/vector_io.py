@@ -825,4 +825,46 @@ For more details on TLS configuration, refer to the [TLS setup guide](https://mi
 Please refer to the remote provider documentation.
 """,
         ),
+        RemoteProviderSpec(
+            api=Api.vector_io,
+            adapter_type="mem0",
+            provider_type="remote::mem0",
+            pip_packages=["mem0>=0.1.0"] + DEFAULT_VECTOR_IO_DEPS,
+            module="llama_stack.providers.remote.vector_io.mem0.mem0",
+            config_class="llama_stack.providers.remote.vector_io.mem0.config.Mem0VectorIOConfig",
+            api_dependencies=[Api.inference],
+            optional_api_dependencies=[Api.files],
+            description="""
+[Mem0](https://mem0.ai) is a remote vector database provider for Llama Stack that provides
+intelligent memory management for AI applications.
+
+## Features
+
+- Memory management for RAG applications
+- Works with both Mem0 Cloud and Mem0 Local
+- Automatic namespace isolation per vector database
+- Simple configuration with cloud or local modes
+
+## Usage
+
+To use Mem0 in your Llama Stack project:
+
+1. Install the necessary dependencies
+2. Configure your Llama Stack project to use Mem0 (cloud or local)
+3. Start storing and querying knowledge
+
+## Installation
+
+For Mem0 Cloud:
+```bash
+pip install mem0
+```
+
+For Mem0 Local, follow the [Mem0 documentation](https://docs.mem0.ai) for setup instructions.
+
+## Documentation
+
+See [Mem0's documentation](https://docs.mem0.ai) for more details about Mem0 in general.
+""",
+        ),
     ]
