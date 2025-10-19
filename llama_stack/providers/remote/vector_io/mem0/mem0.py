@@ -7,7 +7,7 @@
 import io
 import logging
 from contextlib import redirect_stderr, redirect_stdout
-from typing import Any, Optional
+from typing import Any
 
 from llama_stack.apis.common.content_types import InterleavedContent
 from llama_stack.apis.files import Files
@@ -21,7 +21,9 @@ from llama_stack.apis.vector_io import (
 )
 from llama_stack.log import get_logger
 from llama_stack.providers.datatypes import VectorDBsProtocolPrivate
-from llama_stack.providers.utils.inference.prompt_adapter import interleaved_content_as_str
+from llama_stack.providers.utils.inference.prompt_adapter import (
+    interleaved_content_as_str,
+)
 from llama_stack.providers.utils.vector_io.vector_utils import generate_chunk_id
 
 from .config import Mem0VectorIOConfig
@@ -31,9 +33,9 @@ logger = logging.getLogger(__name__)
 
 try:
     # Cloud client
-    from mem0 import MemoryClient as Mem0CloudClient  # type: ignore
     # Local client
     from mem0 import Memory as Mem0Local  # type: ignore
+    from mem0 import MemoryClient as Mem0CloudClient  # type: ignore
 except Exception:  # pragma: no cover
     Mem0CloudClient = None
     Mem0Local = None
@@ -52,8 +54,8 @@ class Mem0VectorIOImpl(VectorIO, VectorDBsProtocolPrivate):
     def __init__(
         self,
         config: Mem0VectorIOConfig,
-        inference_api: Optional[Inference] = None,
-        files_api: Optional[Files] = None,
+        inference_api: Inference | None = None,
+        files_api: Files | None = None,
     ) -> None:
         self.config = config
         self.inference_api = inference_api
@@ -70,7 +72,9 @@ class Mem0VectorIOImpl(VectorIO, VectorDBsProtocolPrivate):
             self._client = Mem0CloudClient(api_key=self.config.api_key, **kwargs)  # type: ignore
         else:
             assert Mem0Local, "mem0 local package not available"
-            assert self.config.local_config, "local_config is required when is_cloud=False"
+            assert (
+                self.config.local_config
+            ), "local_config is required when is_cloud=False"
             self._client = Mem0Local.from_config(config_dict=self.config.local_config)  # type: ignore
 
     async def shutdown(self) -> None:
@@ -121,7 +125,11 @@ class Mem0VectorIOImpl(VectorIO, VectorDBsProtocolPrivate):
             }
             try:
                 with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
-                    kwargs = {} if self._client.__class__.__name__ == "Memory" else {"output_format": "v1.1"}
+                    kwargs = (
+                        {}
+                        if self._client.__class__.__name__ == "Memory"
+                        else {"output_format": "v1.1"}
+                    )
                     self._client.add(
                         [{"role": "user", "content": str(content)}],
                         user_id=user_id,
@@ -141,7 +149,7 @@ class Mem0VectorIOImpl(VectorIO, VectorDBsProtocolPrivate):
         text_query = interleaved_content_as_str(query)
         params = params or {}
         k = params.get("max_chunks", self.config.default_limit)
-        
+
         user_id = _ns_user_id(self.config, vector_db_id)
         aggregated: list[Chunk] = []
         scores: list[float] = []
@@ -153,12 +161,16 @@ class Mem0VectorIOImpl(VectorIO, VectorDBsProtocolPrivate):
             logger.error(f"Error querying Mem0 for {vector_db_id}: {e}")
             return QueryChunksResponse(chunks=[], scores=[])
 
-        items = results.get("results", results) if isinstance(results, dict) else results
+        items = (
+            results.get("results", results) if isinstance(results, dict) else results
+        )
         for r in items or []:
             text = r.get("memory", "")
             meta = r.get("metadata", {}) or {}
             score = float(r.get("score", 0.0))
-            chunk_id = meta.get("chunk_id") or generate_chunk_id(meta.get("document_id", "mem0_doc"), text)
+            chunk_id = meta.get("chunk_id") or generate_chunk_id(
+                meta.get("document_id", "mem0_doc"), text
+            )
             document_id = meta.get("document_id", "mem0_doc")
             chunk = Chunk(
                 content=text,
@@ -176,4 +188,6 @@ class Mem0VectorIOImpl(VectorIO, VectorDBsProtocolPrivate):
 
     async def delete_chunks(self, vector_db_id: str, chunk_ids: list[str]) -> None:
         # Not implemented yet; Mem0 API may not support per-chunk deletes reliably
-        raise NotImplementedError("Per-chunk delete is not supported by the Mem0 adapter yet.")
+        raise NotImplementedError(
+            "Per-chunk delete is not supported by the Mem0 adapter yet."
+        )
